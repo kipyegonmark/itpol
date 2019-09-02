@@ -1,5 +1,9 @@
 # Linux workstation security checklist
 
+Updated: 2017-12-15
+
+*Status: CURRENT*
+
 ### Target audience
 
 This document is aimed at teams of systems administrators who use Linux
@@ -28,10 +32,10 @@ is a crazy person. These guidelines are merely a basic set of core safety
 rules that is neither exhaustive, nor a replacement for experience, vigilance,
 and common sense.
 
-We're sharing this document as a way to
-[bring the benefits of open-source collaboration to IT policy documentation][18]. If
-you find it useful, we hope you'll contribute to its development by making a fork for
-your own organization and sharing your improvements. 
+We're sharing this document as a way to [bring the benefits of open-source
+collaboration to IT policy documentation][18]. If you find it useful, we hope
+you'll contribute to its development by making a fork for your own
+organization and sharing your improvements.
 
 ### Structure
 
@@ -69,6 +73,7 @@ this section addresses core considerations when choosing a work system.
 - [ ] System supports SecureBoot _(ESSENTIAL)_
 - [ ] System has no firewire, thunderbolt or ExpressCard ports _(NICE)_
 - [ ] System has a TPM chip _(NICE)_
+- [ ] System has disabled Intel ME chip _(PARANOID)_
 
 ### Considerations
 
@@ -101,6 +106,30 @@ separately from the core processor, which can be used for additional platform
 security (such as to store full-disk encryption keys), but is not normally used
 for day-to-day workstation operation. At best, this is a nice-to-have, unless
 you have a specific need to use TPM for your workstation security.
+
+#### Intel Management Engine (IME)
+
+Almost every computer with an Intel processor ships with a fully integrated
+management platform chip called the Intel Management Engine (IME). Its purpose
+is to make it easier for device fleet administrators to provision and enroll
+systems, remotely track the device's location, power and network status, and
+even trigger such events as full remote system wipe in case of theft. This
+chip runs a MINIX operating system and comes with a builtin web server.
+
+Unfortunately, with great power come great vulnerabilities. Intel ME chips
+have been demonstrated to be vulnerable to both [local and remote
+attacks][26], allowing perpetrators to take full control over systems with
+Intel ME engine available. Any system with an enabled IME chip should be
+considered potentially vulnerable, especially if it has not received
+manufacturer firmware updates.
+
+There are [some laptop manufacturers][27] that have started providing systems
+with a lot of IME functionality disabled (it is not possible to disable the
+chip completely, as it would likely render the system unbootable). It is also
+possible to use a tool such as [me_cleaner][25] to significantly reduce the
+chip functionality on your own. You should be mindful that it is an involved
+process, and that disabling the IME may void the manufacturer support warranty
+(or even be against your employer policy).
 
 ## Pre-boot environment
 
@@ -148,7 +177,7 @@ what you should consider when picking a distribution to use.
 
 ### Checklist
 
-- [ ] Has a robust MAC/RBAC implementation (SELinux/AppArmor/GrSecurity) _(ESSENTIAL)_
+- [ ] Has a robust MAC/RBAC implementation (SELinux/AppArmor) _(ESSENTIAL)_
 - [ ] Publishes security bulletins _(ESSENTIAL)_
 - [ ] Provides timely security patches _(ESSENTIAL)_
 - [ ] Provides cryptographic verification of packages _(ESSENTIAL)_
@@ -157,7 +186,7 @@ what you should consider when picking a distribution to use.
 
 ### Considerations
 
-#### SELinux, AppArmor, and GrSecurity/PaX
+#### SELinux and AppArmor
 
 Mandatory Access Controls (MAC) or Role-Based Access Controls (RBAC) are an
 extension of the basic user/group security mechanism used in legacy POSIX
@@ -172,11 +201,13 @@ post-installation.
 Distributions that do not provide any MAC/RBAC mechanisms should be strongly
 avoided, as traditional POSIX user- and group-based security should be
 considered insufficient in this day and age. If you would like to start out
-with a MAC/RBAC workstation, AppArmor and GrSecurity/PaX are generally
-considered easier to learn than SELinux. Furthermore, on a workstation, where
-there are few or no externally listening daemons, and where user-run
-applications pose the highest risk, GrSecurity/PaX will offer more security
-benefits than just SELinux.
+with a MAC/RBAC workstation, AppArmor is generally considered easier to learn
+than SELinux.
+
+GrSecurity/PaX is no longer offered as a free download and, as a result,
+almost every publicly available distribution has stopped providing it. If this
+option remains available to you through your employer, you may choose to
+continue using GrSecurity/PaX on your workstation.
 
 #### Distro security bulletins
 
@@ -270,7 +301,9 @@ Examples of good passphrases (yes, you can use spaces):
 - perdon, tengo flatulence
 
 Weak passphrases are combinations of words you're likely to see in published
-works or anywhere else in real life, such as:
+works or anywhere else in real life, and you should avoid using them, as
+attackers are starting to include such simple passphrases into their
+brute-force strategies. Examples of passphrases to avoid:
 
 - Mary had a little lamb
 - you're a wizard, Harry
@@ -452,7 +485,8 @@ Above all, avoid copying your home directory onto any unencrypted storage, even
 as a quick way to move your files around between systems, as you will most
 certainly forget to erase it once you're done, exposing potentially private or
 otherwise security sensitive data to snooping hands -- especially if you keep
-that storage media in the same bag with your laptop.
+that storage media in the same bag with your laptop or in your office desk
+drawer.
 
 #### Selective zero-knowledge backups off-site
 
@@ -474,7 +508,27 @@ adopt. It is most certainly non-exhaustive, but rather attempts to offer
 practical advice that strikes a workable balance between security and overall
 usability.
 
-### Browsing
+### Graphical environment
+
+The venerable X protocol was conceived and implemented for a wholly different
+era of personal computing and lacks important security features that should be
+considered essential on a networked workstation. To give a few examples:
+
+- Any X application has access to full screen contents
+- Any X application can register to receive all keystrokes, regardless into
+  which window they are typed
+
+A sufficiently severe browser vulnerability means attackers get automatic
+access to what is effectively a builtin keylogger and screen recorder and
+can watch and capture everything you type into your root terminal sessions.
+
+You should strongly consider switching to a more modern platform like Wayland,
+even if this means using many of your existing applications through an X11
+protocol wrapper. With Fedora starting to default to Wayland for all
+applications, we can hope that most software will soon stop requiring the
+legacy X11 layer.
+
+### Browsers
 
 There is no question that the web browser will be the piece of software with
 the largest and the most exposed attack surface on your system. It is a tool
@@ -511,12 +565,6 @@ this browser for accessing any other sites except select few.
 
 You should install the following Firefox add-ons:
 
-- [ ] NoScript _(ESSENTIAL)_
-  - NoScript prevents active content from loading, except from user
-    whitelisted domains. It is a great hassle to use with your default browser
-    (though offers really good security benefits), so we recommend only
-    enabling it on the browser you use to access work-related sites.
-
 - [ ] Privacy Badger _(ESSENTIAL)_
   - EFF's Privacy Badger will prevent most external trackers and ad platforms
     from being loaded, which will help avoid compromises on these tracking
@@ -529,15 +577,13 @@ You should install the following Firefox add-ons:
     over a secure connection, even if a link you click is using http:// (great
     to avoid a number of attacks, such as [SSL-strip][7]).
 
-- [ ] Certificate Patrol _(NICE)_
-  - This tool will alert you if the site you're accessing has recently changed
-    their TLS certificates -- especially if it wasn't nearing expiration dates
-    or if it is now using a different certification authority. It helps
-    alert you if someone is trying to man-in-the-middle your connection,
-    but generates a lot of benign false-positives.
-
-You should leave Firefox as your default browser for opening links, as
-NoScript will prevent most active content from loading or executing.
+- [ ] uMatrix _(NICE)_
+  - uMatrix prevents active content from third-party locations from being
+    loaded and executed. It is a hassle to use with your default browser
+    (though offers really good security benefits), so we recommend only
+    enabling it on the browser you use to access work-related sites.
+    Here's a [Video Overview](https://www.youtube.com/watch?v=TVozpo3zUBk) of
+    uMatrix.
 
 ##### Chrome/Chromium for everything else
 
@@ -550,47 +596,78 @@ the usual paranoid caution about not using it for anything you don't want
 Google to know about).
 
 It is recommended that you install **Privacy Badger** and **HTTPS Everywhere**
-extensions in Chrome as well and give it a distinct theme from Firefox to
-indicate that this is your "untrusted sites" browser.
+extensions in Chrome (and uMatrix, too, if you're comfortable with it), as
+well and give it a distinct theme from Firefox to indicate that this is your
+"untrusted sites" browser.
 
-#### 2: Use two different browsers, one inside a dedicated VM _(NICE)_
+#### 2: Use firejail _(ESSENTIAL)_
 
-This is a similar recommendation to the above, except you will add an extra
-step of running the "everything else" browser inside a dedicated VM that you
-access via a fast protocol, allowing you to share clipboards and forward sound
-events (e.g.  Spice or RDP). This will add an excellent layer of isolation
-between the untrusted browser and the rest of your work environment, ensuring
-that attackers who manage to fully compromise your browser will then have to
-additionally break out of the VM isolation layer in order to get to the rest
-of your system.
+[Firejail][19] is a project that uses Linux namespaces and seccomp-bpf to
+create a sandbox around Linux applications. It is an excellent way to help
+build additional protection between the browser and the rest of your system.
+You can use Firejail to create separate isolated instances of Firefox to
+use for different purposes -- for work, for personal but trusted sites (such
+as banking), and one more for casual browsing (social media, etc).
 
-This is a surprisingly workable configuration, but requires a lot of RAM and
-fast processors that can handle the increased load. It will also require an
-important amount of dedication on the part of the admin who will need to
-adjust their work practices accordingly.
+Firejail is most effective on Wayland, unless you use X11-isolation mechanisms
+(the `--x11` flag). To start using Firejail with Firefox, please refer to the
+documentation provided by the project:
+
+- [Firefox Sandboxing Guide][20]
+
+Most frequently, you'll just want to pass a `--private=directory` switch to
+separate your browsing profiles. You can create convenient aliases and add
+them to your `.bashrc`:
+
+    alias ff-perso="firejail --private=$HOME/.firejail/personal firefox -no-remote"
+    alias ff-work="firejail --private=$HOME/.firejail/work firefox -no-remote"
+
+Any downloaded files will be located in `~/.firejail/[name]/Downloads`. To
+upload files, you'll need to move them into that subdirectory first.
 
 #### 3: Fully separate your work and play environments via virtualization _(PARANOID)_
 
-See [Qubes-OS project][3], which strives to provide a high-security
+See [QubesOS project][3], which strives to provide a "reasonably secure"
 workstation environment via compartmentalizing your applications into separate
-fully isolated VMs.
+fully isolated VMs. You may also investigate [SubgraphOS][24] that achieves
+similar goals using container technology (currently in Alpha).
+
+### Use Fido U2F for website 2-factor authentication
+
+[Fido U2F][22] is a standard developed specifically to provide a mechanism for
+2-factor authentication *and* combat credential phishing. Regular OTP
+(one-time password) mechanisms are ineffective in the case where the attacker
+is able to trick you into submitting your password and token into a malicious
+site masquerading as a legitimate service. The U2F protocol will store site
+authentication data on the USB token that will prevent you from accidentally
+giving an attacker both your password and your one-time token if you try to
+use it on anything other than the legitimate website.
+
+See this site for a curated list of services providing Fido U2F support:
+
+- [dongleauth.info][23]
+
+Note, that not all browsers currently support U2F-capable hardware tokens, and
+if you use sandboxes or virtualization-based isolation around your browser,
+you may have to work extra hard to enable USB pass-through from the
+application to your USB token.
 
 ### Password managers
 
 #### Checklist
 
 - [ ] Use a password manager _(ESSENTIAL)_
-- [ ] Use unique passwords on unrelated sites _(ESSENTIAL)_
+- [ ] Use unique, randomly generated passwords on unrelated sites _(ESSENTIAL)_
 - [ ] Use a password manager that supports team sharing _(NICE)_
 - [ ] Use a separate password manager for non-website accounts _(NICE)_
 
 #### Considerations
 
-Using good, unique passwords should be a critical requirement for every member
-of your team. Credential theft is happening all the time -- either via
-compromised computers, stolen database dumps, remote site exploits, or any
-number of other means. No credentials should ever be reused across sites,
-especially for critical applications.
+Using strong, unique, randomly generated passwords should be a critical
+requirement for every member of your team. Credential theft is happening all
+the time -- either via compromised computers, stolen database dumps, remote
+site exploits, or any number of other means. No credentials should be reused
+across different sites, ever.
 
 ##### In-browser password manager
 
@@ -647,30 +724,9 @@ to ensure that your private keys are well protected against theft.
 
 #### Considerations
 
-The best way to prevent private key theft is to use a smartcard to store your
-encryption private keys and never copy them onto the workstation. There are
-several manufacturers that offer OpenPGP capable devices:
-
-- [Kernel Concepts][12], where you can purchase both the OpenPGP compatible
-  smartcards and the USB readers, should you need one.
-- [Yubikey NEO][13], which offers OpenPGP smartcard functionality in addition
-  to many other cool features (U2F, PIV, HOTP, etc).
-
-It is also important to make sure that the master PGP key is not stored on the
-main workstation, and only subkeys are used. The master key will only be
-needed when signing someone else's keys or creating new subkeys -- operations
-which do not happen very frequently. You may follow [the Debian's subkeys][14]
-guide to learn how to move your master key to removable storage and how to
-create subkeys.
-
-You should then configure your gnupg agent to act as ssh agent and use the
-smartcard-based PGP Auth key to act as your ssh private key. We publish a
-[detailed guide][15] on how to do that using either a smartcard reader or a
-Yubikey NEO.
-
-If you are not willing to go that far, at least make sure you have a strong
-passphrase on both your PGP private key and your SSH private key, which will
-make it harder for attackers to steal and use them.
+Please see the "Protecting Code Integrity with PGP" document available in the
+same repository for introduction to PGP best practices and instructions on how
+to set up and use offline master and smartcard subkeys.
 
 ### Hibernate or shut down, do not suspend
 
@@ -685,13 +741,6 @@ it or leaving it on.
 If you are using a distribution that comes bundled with SELinux (such as
 Fedora), here are some recommendation of how to make the best use of it to
 maximize your workstation security.
-
-#### Checklist
-
-- [ ] Make sure SELinux is enforcing on your workstation _(ESSENTIAL)_
-- [ ] Never blindly run `audit2allow -M`, always check _(ESSENTIAL)_
-- [ ] Never `setenforce 0` _(NICE)_
-- [ ] Switch your account to SELinux user `staff_u` _(NICE)_
 
 #### Considerations
 
@@ -708,88 +757,13 @@ to gain root-level access via a vulnerable daemon service.
 
 Our recommendation is to leave it on and enforcing.
 
-##### Never `setenforce 0`
-
-It's tempting to use `setenforce 0` to flip SELinux into permissive mode
-on a temporary basis, but you should avoid doing that. This essentially turns
-off SELinux for the entire system, while what you really want is to
-troubleshoot a particular application or daemon.
-
-Instead of `setenforce 0` you should be using `semanage permissive -a
-[somedomain_t]` to put only that domain into permissive mode. First, find out
-which domain is causing troubles by running `ausearch`:
-
-    ausearch -ts recent -m avc
-
-and then look for `scontext=` (source SELinux context) line, like so:
-
-    scontext=staff_u:staff_r:gpg_pinentry_t:s0-s0:c0.c1023
-                             ^^^^^^^^^^^^^^
-
-This tells you that the domain being denied is `gpg_pinentry_t`, so if you
-want to troubleshoot the application, you should add it to permissive domains:
-
-    semanage permissive -a gpg_pinentry_t
-
-This will allow you to use the application and collect the rest of the AVCs,
-which you can then use in conjunction with `audit2allow` to write a local
-policy. Once that is done and you see no new AVC denials, you can remove that
-domain from permissive by running:
-
-    semanage permissive -d gpg_pinentry_t
-
-##### Use your workstation as SELinux role staff_r
-
-SELinux comes with a native implementation of roles that prohibit or grant
-certain privileges based on the role associated with the user account. As an
-administrator, you should be using the `staff_r` role, which will restrict
-access to many configuration and other security-sensitive files, unless you
-first perform `sudo`.
-
-By default, accounts are created as `unconfined_r` and most applications you
-execute will run unconfined, without any (or with only very few) SELinux
-constraints. To switch your account to the `staff_r` role, run the following
-command:
-
-    usermod -Z staff_u [username]
-
-You should log out and log back in to enable the new role, at which point if
-you run `id -Z`, you'll see:
-
-    staff_u:staff_r:staff_t:s0-s0:c0.c1023
-
-When performing `sudo`, you should remember to add an extra flag to tell
-SELinux to transition to the "sysadmin" role. The command you want is:
-
-    sudo -i -r sysadm_r
-
-At which point `id -Z` will show:
-
-    staff_u:sysadm_r:sysadm_t:s0-s0:c0.c1023
-
-**WARNING**: you should be comfortable using `ausearch` and `audit2allow`
-before you make this switch, as it's possible some of your applications will
-no longer work when you're running as role `staff_r`. At the time of writing,
-the following popular applications are known to not work under `staff_r`
-without policy tweaks:
-
-- Chrome/Chromium
-- Skype
-- VirtualBox
-
-To switch back to `unconfined_r`, run the following command:
-
-    usermod -Z unconfined_u [username]
-
-and then log out and back in to get back into the comfort zone.
-
 ## Further reading
 
 The world of IT security is a rabbit hole with no bottom. If you would like to
 go deeper, or find out more about security features on your particular
 distribution, please check out the following links:
 
-- [Fedora Security Guide](https://docs.fedoraproject.org/en-US/Fedora/19/html/Security_Guide/index.html)
+- [Fedora Security Guide](https://docs-old.fedoraproject.org/en-US/Fedora/19/html/Security_Guide/index.html)
 - [CESG Ubuntu Security Guide](https://www.gov.uk/government/publications/end-user-devices-security-guidance-ubuntu-1404-lts)
 - [Debian Security Manual](https://www.debian.org/doc/manuals/securing-debian-howto/index.en.html)
 - [Arch Linux Security Wiki](https://wiki.archlinux.org/index.php/Security)
@@ -812,9 +786,18 @@ This work is licensed under a
 [10]: https://pypi.python.org/pypi/django-pstore
 [11]: https://github.com/TomPoulton/hiera-eyaml
 [12]: http://shop.kernelconcepts.de/
-[13]: https://www.yubico.com/products/yubikey-hardware/yubikey-neo/
+[13]: https://www.yubico.com/products/yubikey-hardware/
 [14]: https://wiki.debian.org/Subkeys
 [15]: https://github.com/lfit/ssh-gpg-smartcard-config
 [16]: http://www.pavelkogan.com/2014/05/23/luks-full-disk-encryption/
 [17]: https://en.wikipedia.org/wiki/Cold_boot_attack
-[18]: http://www.linux.com/news/featured-blogs/167-amanda-mcpherson/850607-linux-foundation-sysadmins-open-source-their-it-policies
+[18]: https://www.linuxfoundation.org/blog/2015/09/linux-foundation-sysadmins-open-source-their-it-policies/
+[19]: https://firejail.wordpress.com/
+[20]: https://firejail.wordpress.com/documentation-2/firefox-guide/
+[21]: https://www.nitrokey.com/
+[22]: https://en.wikipedia.org/wiki/Universal_2nd_Factor
+[23]: http://www.dongleauth.info/
+[24]: https://subgraph.com/sgos/
+[25]: https://github.com/corna/me_cleaner
+[26]: https://en.wikipedia.org/wiki/Intel_Active_Management_Technology#Known_vulnerabilities_and_exploits
+[27]: https://puri.sm/posts/purism-librem-laptops-completely-disable-intel-management-engine/
